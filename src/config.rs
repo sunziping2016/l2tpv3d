@@ -5,6 +5,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+pub struct RouterId(Ipv4Addr);
+
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum PseudowireType {
     Ethernet,
@@ -19,11 +22,11 @@ pub struct Config {
 
     /// Listeners to accept incoming control connections.
     #[serde(default)]
-    pub listener: Vec<ListenerConfig>,
+    pub listen: Vec<ListenerConfig>,
 
     /// Connectors to initiate outgoing control connections.
     #[serde(default)]
-    pub connector: Vec<ConnectorConfig>,
+    pub connect: Vec<ConnectorConfig>,
 
     /// Peers configuration.
     pub peer: Vec<PeerConfig>,
@@ -37,7 +40,7 @@ pub struct L2tpConfig {
     pub hostname: String,
 
     /// Router ID of the L2TPv3 endpoint.
-    pub router_id: Ipv4Addr,
+    pub router_id: RouterId,
 
     /// Pseudowire types advertised in SCCRQ/SCCRP.
     #[serde(default)]
@@ -54,24 +57,25 @@ pub enum Transport {
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ListenerConfig {
-    /// Tag of the listener. Defaults to `listener-<n>`, where `<n>` is
-    /// the 1-based index of this listener in the configuration file.
+    /// Tag of the listener
     #[serde(default)]
-    pub tag: String,
+    pub tag: Option<String>,
 
     pub transport: Transport,
 
     #[serde(default)]
-    pub local_address: Option<OneOrMany<String>>,
+    pub local_address: Option<String>,
+
+    #[serde(default)]
+    pub interface: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ConnectorConfig {
-    /// Tag of the connector. Defaults to `connector-<n>`, where `<n>` is
-    /// the 1-based index of this connector in the configuration file.
+    /// Tag of the connector
     #[serde(default)]
-    pub tag: String,
+    pub tag: Option<String>,
 
     pub transport: Transport,
 
@@ -80,7 +84,14 @@ pub struct ConnectorConfig {
     pub local_address: Option<String>,
 
     /// The remote address to connect to.
-    pub remote_address: OneOrMany<String>,
+    pub remote_address: String,
+
+    /// Specify the expect remote Router ID for tie-breaking.
+    #[serde(default)]
+    pub remote_router_id: Option<RouterId>,
+
+    #[serde(default)]
+    pub interface: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
@@ -128,7 +139,7 @@ pub struct PeerMatchConfig {
 
     /// Match by router ID.
     #[serde(default)]
-    pub router_id: Option<OneOrMany<Ipv4Addr>>,
+    pub router_id: Option<OneOrMany<RouterId>>,
 
     /// Match by listener or connector tag.
     #[serde(default)]

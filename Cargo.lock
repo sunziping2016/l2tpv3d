@@ -95,10 +95,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ipnet",
+ "libc",
  "regex",
  "schemars",
  "serde",
  "serde_json",
+ "socket2",
  "tokio",
  "toml",
 ]
