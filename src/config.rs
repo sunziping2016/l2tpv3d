@@ -113,17 +113,12 @@ pub struct AuthenticationConfig {
     pub password_file: PathBuf,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum AuthenticationMode {
     Optional,
+    #[default]
     Required,
-}
-
-impl Default for AuthenticationMode {
-    fn default() -> Self {
-        AuthenticationMode::Required
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
@@ -172,15 +167,11 @@ pub struct SessionConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[derive(Default)]
 pub enum Sequencing {
     All,
+    #[default]
     None,
-}
-
-impl Default for Sequencing {
-    fn default() -> Self {
-        Sequencing::None
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
