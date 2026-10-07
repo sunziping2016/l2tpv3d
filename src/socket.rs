@@ -1,4 +1,5 @@
 use std::{
+    future::poll_fn,
     io,
     mem::{self, MaybeUninit},
     net::SocketAddr,
@@ -10,6 +11,7 @@ use socket2::{SockAddr, SockAddrStorage, Socket, Type};
 use tokio::{
     io::unix::AsyncFd,
     net::{ToSocketAddrs, lookup_host},
+    task::coop::poll_proceed,
 };
 
 macro_rules! each_addr {
@@ -68,13 +70,16 @@ impl L2tpSocket {
     }
 
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        // [TODO] add budge
         let buf = unsafe {
             slice::from_raw_parts_mut(buf.as_mut_ptr() as *mut MaybeUninit<u8>, buf.len())
         };
         loop {
             let mut guard = self.inner.readable().await?;
+            let coop = poll_fn(poll_proceed).await;
             match guard.try_io(|inner| inner.get_ref().recv_from(buf)) {
                 Ok(result) => {
+                    coop.made_progress();
                     return result.map(|(size, addr)| {
                         (
                             size,
@@ -94,8 +99,12 @@ impl L2tpSocket {
         };
         loop {
             let mut guard = self.inner.readable().await?;
+            let coop = poll_fn(poll_proceed).await;
             match guard.try_io(|inner| inner.get_ref().recv(buf)) {
-                Ok(result) => return result,
+                Ok(result) => {
+                    coop.made_progress();
+                    return result;
+                }
                 Err(_would_block) => continue,
             }
         }
@@ -104,8 +113,12 @@ impl L2tpSocket {
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
         loop {
             let mut guard = self.inner.writable().await?;
+            let coop = poll_fn(poll_proceed).await;
             match guard.try_io(|inner| inner.get_ref().send(buf)) {
-                Ok(result) => return result,
+                Ok(result) => {
+                    coop.made_progress();
+                    return result;
+                }
                 Err(_would_block) => continue,
             }
         }
