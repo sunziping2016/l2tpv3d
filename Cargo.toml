@@ -7,19 +7,21 @@ edition = "2024"
 anyhow = "1.0.104"
 better_tokio_select = "0.2.0"
 futures = "0.3.34"
+hmac = "0.13.0"
 ipnet = { version = "2.12.2", features = ["schemars1", "serde"] }
 libc = "0.2.189"
+md-5 = "0.11.0"
+rand = "0.10.3"
 regex = "1.13.1"
 schemars = "1.2.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+sha1 = "0.11.0"
+smallvec = { version = "1.16.2", features = ["const_new"] }
 socket2 = "0.6.5"
 thiserror = "2.0.21"
-tokio = { version = "1.49.0", features = ["full", "taskdump", "test-util", "tracing"] }
+tokio = { version = "1.49.0", features = ["full", "test-util"] }
 tokio-util = { version = "0.7.19", features = ["time"] }
 toml = "1.1.6"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
-
-[dev-dependencies]
-rand = "0.10.3"
