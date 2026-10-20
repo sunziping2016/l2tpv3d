@@ -104,21 +104,9 @@ pub struct PeerConfig {
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct AuthenticationConfig {
-    /// Mode of the authentication. Defaults to `required`.
-    #[serde(default)]
-    pub mode: AuthenticationMode,
-
     /// File containing the password.
     #[serde(default)]
     pub password_file: PathBuf,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema, Default)]
-#[serde(rename_all = "kebab-case")]
-pub enum AuthenticationMode {
-    Optional,
-    #[default]
-    Required,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]

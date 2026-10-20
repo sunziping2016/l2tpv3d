@@ -1,5 +1,4 @@
 use std::{
-    future::poll_fn,
     io,
     mem::{self, MaybeUninit},
     net::SocketAddr,
@@ -9,31 +8,9 @@ use std::{
 
 use socket2::{SockAddr, SockAddrStorage, Socket, Type};
 use tokio::{
-    io::unix::AsyncFd,
-    net::{ToSocketAddrs, lookup_host},
-    task::coop::poll_proceed,
+    io::{Interest, unix::AsyncFd},
+    net::ToSocketAddrs,
 };
-
-macro_rules! each_addr {
-    ($addr:expr, |$arg:ident| $body:expr) => {{
-        let mut last_err = None;
-        for $arg in $addr {
-            match $body {
-                Ok(l) => return Ok(l),
-                Err(e) => last_err = Some(e),
-            }
-        }
-        match last_err {
-            Some(err) => Err(err),
-            None => Err(last_err.unwrap_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "could not resolve to any addresses",
-                )
-            })),
-        }
-    }};
-}
 
 pub struct L2tpSocket {
     inner: AsyncFd<Socket>,
@@ -45,7 +22,7 @@ impl L2tpSocket {
         conn_id: u32,
         interface: Option<&[u8]>,
     ) -> io::Result<Self> {
-        each_addr!(lookup_host(addr).await?, |addr| {
+        super::each_addr(addr, |&addr| {
             let addr = l2tp_sockaddr(addr, conn_id);
             let sock = Socket::new(
                 addr.domain(),
@@ -60,68 +37,44 @@ impl L2tpSocket {
                 inner: AsyncFd::new(sock)?,
             })
         })
+        .await
     }
 
     pub async fn connect<A: ToSocketAddrs>(&self, addr: A, conn_id: u32) -> io::Result<()> {
-        each_addr!(lookup_host(addr).await?, |addr| {
+        super::each_addr(addr, |&addr| {
             let addr = l2tp_sockaddr(addr, conn_id);
             self.inner.get_ref().connect(&addr)
         })
+        .await
     }
 
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        // [TODO] add budge
         let buf = unsafe {
             slice::from_raw_parts_mut(buf.as_mut_ptr() as *mut MaybeUninit<u8>, buf.len())
         };
-        loop {
-            let mut guard = self.inner.readable().await?;
-            let coop = poll_fn(poll_proceed).await;
-            match guard.try_io(|inner| inner.get_ref().recv_from(buf)) {
-                Ok(result) => {
-                    coop.made_progress();
-                    return result.map(|(size, addr)| {
-                        (
-                            size,
-                            addr.as_socket()
-                                .expect("invalid ss_family returned from kernel"),
-                        )
-                    });
-                }
-                Err(_would_block) => continue,
-            }
-        }
+        self.inner
+            .async_io(Interest::READABLE, |inner| inner.recv_from(buf))
+            .await
+            .map(|(size, addr)| {
+                (
+                    size,
+                    addr.as_socket()
+                        .expect("invalid ss_family returned from kernel"),
+                )
+            })
     }
 
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        let buf = unsafe {
-            slice::from_raw_parts_mut(buf.as_mut_ptr() as *mut MaybeUninit<u8>, buf.len())
-        };
-        loop {
-            let mut guard = self.inner.readable().await?;
-            let coop = poll_fn(poll_proceed).await;
-            match guard.try_io(|inner| inner.get_ref().recv(buf)) {
-                Ok(result) => {
-                    coop.made_progress();
-                    return result;
-                }
-                Err(_would_block) => continue,
-            }
-        }
+        let buf = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr() as *mut _, buf.len()) };
+        self.inner
+            .async_io(Interest::READABLE, |inner| inner.recv(buf))
+            .await
     }
 
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        loop {
-            let mut guard = self.inner.writable().await?;
-            let coop = poll_fn(poll_proceed).await;
-            match guard.try_io(|inner| inner.get_ref().send(buf)) {
-                Ok(result) => {
-                    coop.made_progress();
-                    return result;
-                }
-                Err(_would_block) => continue,
-            }
-        }
+        self.inner
+            .async_io(Interest::WRITABLE, |inner| inner.send(buf))
+            .await
     }
 
     pub fn device(&self) -> io::Result<Option<Vec<u8>>> {
